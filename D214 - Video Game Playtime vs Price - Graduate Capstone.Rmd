@@ -1,0 +1,470 @@
+---
+title: "D214 Data Analytics Capstone - User median video game play time prediction"
+author: "Lucas Benish - StudentID: 009978338"
+date: "2023-07-06"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+
+# Research Question
+
+## A. Summarize the original real-data research question you identified in task 1. Your summary should include justification for the research question you identified in task 1, a description of the context in which the research question exists, and a discussion of your hypothesis.
+
+The research question that I have chosen to investigate is as follows: utilizing existing Steam Store game data, to what extent does a video game's price point affect its users' play time?
+
+This question is relevant to me, as I have been a consumer of video games since I was a child. I have my own thoughts and perceptions around the time and money I have invested into video games, and would like to see if these perceptions hold weight when challenged by a data related reasearch question. I have always felt that if I have spent money on a game, I should "get my money's worth out of it," or see a game through to its completion. This is akin to the sunk-cost fallacy, where "our tendency to follow through on an endeavor" increases as we pour our time, finances, and effort into it (The Decision Lab, n.d.).
+
+### The hypotheses I am therefore posing are as follows:
+
+#### Null hypothesis: The price of a game does not statistically significantly (p \<= 0.05) affect median play time.
+
+#### Alternative hypothesis: The price of a game does statistically significantly (p \<= 0.05) affect median play time.
+
+As mentioned above, I am interested in this from a consumer perspective as I believe that's where the value of a model predicting a user's median playtime could arise. A model predicting median play time could allow a consumer to determine their expected playtime based significant variables. The model would dictate which variables are statistically significant, such as price, developer, publisher, genre, category, etc. Understanding how these variables affect the output of median play time may sway an individual to purchase or not purchase a given title.
+
+# Data collection
+
+## B. Report on your data-collection process by describing the relevant data you collected, discussing one advantage and one disadvantage of the data-gathering methodology you used, and discussing how you overcame any challenges you encountered during the process of collecting your data.
+
+To begin my data gathering process, I utilized the website www.kaggle.com which is known to have free, open-source data across a variety of project topics. The advantage of utilizing Kaggle for acquiring data is that it is a free and open website for students/researchers looking to acquire data for projects. This means that there are no approval processes required to access the data due to being publicly available. However, one disadvantage to utilizing Kaggle is that without a clear idea or hypothesis in mind, one may be stuck with decision paralysis while attempting to choose a dataset. Decision paralysis is defined as difficulty making decisions when options are challenging to compare (Ludwig, n.d.). I overcame this disadvantage by having a clearly laid out research question and hypothesis to guide my search and ease the burden of making a decision.
+
+Once on www.kaggle.com, I navigated to "datasets" on the left hand side of the web browser. I had an idea in mind of what type of data I wanted to work with based on the question I proposed, but the sheer volume of datasets available on Kaggle is daunting. By selecting the card/tab "all datasets," it can be seen that there are 230,000+ free datasets to choose from. Returning back to the original datasets tab, rather than the "all datasets" tab, I utilized the advanced search feature to narrow down datasets to only those with a "usability" score greater than 8.00. I then searched "game" and began perusing the given datasets. There were two datasets within the top 10 pertaining to video games, rather than tabletop games or sports. At this point, I opted for the dataset titled "Steam Store Games (Clean dataset)" as it had the higher usability score of the two at 9.1/10. I then downloaded the "steam.csv" file to my D214 - Capstone folder to prepare for the next steps of my analysis.
+
+# Data Extraction and Preparation
+
+## C. Summarize the data cleaning process by doing the following: Describe your data-extraction and -preparation process and provide screenshots to illustrate each step. Explain the tools and techniques you used for data extraction and data preparation, including how these tools and techniques were used on the data. Justify why you used these particular tools and techniques, including one advantage and one disadvantage when they are used with your data-extraction and -preparation methods.
+
+```{r}
+#setting up environment
+library(readr)
+library(tidyr)
+library(dplyr)
+library(broom)
+library(ggplot2)
+library(splitstackshape)
+library(gen5helper)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(tinytex)
+```
+
+The first step of any data extraction and preparation process is establishing the environment. I first loaded the packages that I would need to import my data, and perform the necessary cleaning steps/modeling. A clear advantage of utilizing R studio and the selected packages above is that there is clear and readily accessible documentation online in many formats. It will be seen throughout my paper that I reference RDocumentation on multiple occasions. One disadvantage that was noted during my cleaning process was that when splitting text columns in R, it is often required to know how many columns one will be splitting into. This disadvantage was overcome via utilizing a package I found during my research, splitstackshape. Splitstackshape allows splitting of a column of text into multiple columns without the need to know the final number of columns.
+
+Readr is brought in to utilize the read_csv() function to bring in the dataset. Dplyr, tidyr, and broom are all utilized for arranging data in a presentable, "tidy" format during exploration. Further, the dplyr packages allow sfor piping formulas from one to the next, rather than nesting forumala within one another. Splitstackshape and gen5helper will both be utilized as well with cleaning and preparing the data, to split out columns that contain multiple strings into multiple columns. Ggplot2 will be utilized to create visualizations during the exploration process, as well as for reporting within the analysis. Hmisc and PerformanceAnalytics will be utilized to determine and visualize pairwise correlations of the numeric variables within the dataset to prepare variables for use within my final model. Finally, tinytext will be utilized for conversion of this file into a PDF or html file for submission.
+
+```{r}
+#import dataset
+steam <- read_csv("C:/Users/lgben/OneDrive/Desktop/MSDA/D214 - Capstone/steam.csv")
+summary(steam)
+```
+
+```{r}
+#determining number of unique values in categorical variables
+length(unique(steam$developer))
+length(unique(steam$publisher))
+length(unique(steam$platforms))
+length(unique(steam$categories))
+length(unique(steam$steamspy_tags))
+length(unique(steam$owners))
+```
+
+```{r}
+#beginning to clean
+sum(duplicated((steam)))
+sum(is.na(steam))
+na_rows <- which(is.na(steam))
+
+steam2 <- subset(steam, select = -c(steamspy_tags, developer, publisher, average_playtime, owners))
+    #dropping tags, as upon initial review there are >50 tags, and many are similar to genres
+    #dropping average playtime, as median will be utilized as dependent variable
+    #dropping owners column due to being range
+steam2 <- drop_na(steam2)
+sum(is.na(steam2))
+```
+
+Upon importing the dataset, the initial exploration began as shown above. The summary() call shows us the makeup of the dataset, including the column names, quartiles for numeric variables, as well as the dimensions of the dataset (27075 observations of 18 columns). Following this initial glimpse, I determine the presence of nulls and duplicate values. The number of rows with null values was very low (6 observations), considering the dataset has over 27,000 observations. For this reason, it was decided to simply omit any rows that contained nulls.
+
+Furthermore, columns which were not going to be used in the analysis were dropped from the dataset during the process of a secondary data frame being created. Steamspy_tags was dropped due to the number of dummy columns needed to be created would have been \>50. For this same reason, developer and publisher were also dropped. Average playtime was dropped due to the variable of interest being median playtime. Owners was dropped due to being a range of values rather than distinct, continuous values.
+
+```{r}
+#changing character "year" column into date column
+#adding release year column
+steam2$release_date <- as.Date(steam2$release_date)
+steam2$release_year <- as.integer(format(steam2$release_date, format="%Y"))
+#Marsja (2020) #https://www.marsja.se/how-to-extract-year-from-date-in-r-with-examples/
+
+#limiting this to newer games, as these likely paint a clearer picture of current status of video games
+steam_new <- steam2[steam2$release_year >= "2018", ]
+
+#limiting to only English titles for purpose of this analysis, due to being an English speaker
+steam_new <- steam_new[steam_new$english == 1, ]
+
+summary(steam_new)
+```
+
+The above code demonstrates the transformation of release date into a date column. From there, a new column is created to store the release year of a game. This was performed by adapting code from Marsja (2020) and turning the column into an integer column rather than a character column. This column would be used for filtering to more recent games. For this analysis, only games that were released during and after the year 2018 were included. This is to keep the model "relevant" to current consumers by only including recent titles. Furthermore, I also decided to limit my analysis to only games with a label of "English," due being a native English speaker and residing within the US. The process of filtering these observations was completed via creation of a new dataframe, steam_new.
+
+```{r}
+#modifying price from GBP to USD
+# https://www.exchangerates.org.uk/GBP-USD-01_06_2019-exchange-rate-history.html
+steam_new$price_usd <- round(steam_new$price * 1.2639, 2)
+```
+
+The initial dataset provided the price of each game in pounds (GBP). As I reside in the US, I decided to transform this value into US dollars. I researched the conversion rate of GBP to USD near June 1st, 2019 as that is approximately when the data was initially taken from the Steam store. It was found that at close on June 1st, 1 GBP was equivalent to 1.2639 USD. This would translate then to Value_USD = Value_GBP \* 1.2639, rounded to the nearest hundredth.
+
+```{r}
+#creating one-hot encoded columns for platforms
+platforms <- as.data.frame(steam_new$platforms)
+
+names(platforms)[names(platforms) == 'steam_new$platforms'] <- "platforms"
+cSplit(platforms, splitCols = 'platforms', sep=";")
+
+platforms2 <- cSplit(platforms, splitCols = 'platforms', sep=";")
+
+names(platforms2)[names(platforms2) == c('platforms_1', 'platforms_2', 'platforms_3')] <- c('WindowsFLG', 'MacFLG', 'LinuxFLG')
+platforms3 <- platforms2
+platforms3$WindowsFLG <- as.integer(case_when(platforms2$WindowsFLG =='windows' ~ 1
+                                   , .default = 0))
+platforms3$MacFLG <- as.integer(case_when(platforms2$MacFLG =='mac' ~ 1
+                                              , .default = 0))
+platforms3$LinuxFLG <- as.integer(case_when(platforms2$LinuxFLG =='linux' ~ 1
+                                              , .default = 0))
+
+summary(platforms3)
+remove(platforms)
+remove(platforms2)
+
+#splitstackshape documentation https://www.r-project.org/nosvn/pandoc/splitstackshape.html 
+```
+
+```{r}
+#creating "primary"/first listed column for genre
+genres <- as.data.frame(steam_new$genres)
+
+names(genres)[names(genres) == 'steam_new$genres'] <- "genres"
+as.is(cSplit(genres, splitCols = 'genres', sep=";"), TRUE)
+
+genres2 <- as.is(cSplit(genres, splitCols = 'genres', sep=";"), TRUE)
+genres2 <- genres2[, 1]
+
+names(genres2)[names(genres2) == 'genres_01'] <- c('Primary_genre')
+genres3 <- genres2
+
+summary(genres3)
+remove(genres)
+remove(genres2)
+```
+
+```{r}
+#creating "primary"/first listed column for category
+categories <- as.data.frame(steam_new$categories)
+
+names(categories)[names(categories) == 'steam_new$categories'] <- "categories"
+as.is(cSplit(categories, splitCols = 'categories', sep=";"), TRUE)
+
+categories2 <- as.is(cSplit(categories, splitCols = 'categories', sep=";"), TRUE)
+categories2 <- categories2[, 1]
+
+names(categories2)[names(categories2) == 'categories_01'] <- c('Primary_category')
+categories3 <- categories2
+
+summary(categories3)
+remove(categories2)
+remove(categories)
+```
+
+The above three code chunks involve transforming three categorical columns that all contain multiple strings of text within a single observation. The "platforms" column contained some combination of 'windows,' 'mac,' and 'linux,' each being separated by semi-colons (;). A similar situation was presented for genres and categories of the games. Each contained 1 or more strings separated by a semi-colon.
+
+While researching the best way to split these into multiple columns, I encountered a disadvantage of many commonly utilized packages: splitting data typically requires one to know how many columns the split would result in. Due to the large size of the dataset, I was unsure how many potential columns this split would require. I then encountered a StackOverflow exchange (2015) where a developer utilized a package he had created to split strings out into columns. The name of this package is "splitstackshape," developed and maintained by Ananda Mahto (2019). This package does not require a user to know how many columns a single column will split into when reshaping the data. However, while attempting to split my data, I again encountered an error. The error noted that "as.is()" was required to output the columns appropriately from my calls of cSplit() from splitstackshape.
+
+I began to research where to find "as.is()," as it was not located within base R. I found a resource for the package gen5helper detailing how to utilize "as.is()." I installed and uploaded the package, and nested my cSplit() function within "as.is()." This allowed me to appropriately output the dataframes containing the original genre, platforms, and category variables. I then narrowed these new dataframes down to just the first column, which became the "Primary_variable," i.e. "Primary_category," "Primary_genre."
+
+This process was completed for steam_new\$platforms, steam_new\$genres, and steam_new\$categories.
+
+```{r}
+#binding new columns to steam2
+steam_new <- cbind(steam_new, genres3, platforms3, categories3)
+steam3 <- subset(steam_new, select = -c(platforms, genres, price, categories))
+```
+
+Following the creation of the new "Primary" variable columns for platforms, genres, and categories, these columns were bound to steam_new via cbind(). No errors arose here, as all columns had the same number of observations. Steam_new was then subset to remove the now unnecessary original columns: platforms, genres, categories, and the original price column in GBP.
+
+```{r}
+new_na_rows <- which(is.na(steam3))
+#this should be empty/null as only including "primary" columns from splitting above
+```
+
+It was verified once again that no null values existed in the dataset, despite the new transformations.
+
+```{r}
+#determining presence of outliers from numberic variables
+#z-score columns
+steam3$positive_ratings_z <- scale(x=steam3$positive_ratings)
+steam3$negative_ratings_z <- scale(x=steam3$negative_ratings)
+steam3$median_playtime_z <- scale(x=steam3$median_playtime)
+steam3$price_usd_z <- scale(x=steam3$price_usd)
+
+
+#outlier vectors
+pos_rating_outliers <- which(steam3$positive_ratings_z >3 | steam3$positive_ratings_z < -3)
+neg_rating_outliers <- which(steam3$negative_ratings_z >3 | steam3$negative_ratings_z < -3)
+med_playtime_outliers <- which(steam3$median_playtime_z >3 | steam3$median_playtime_z < -3)
+price_outliers <- which(steam3$price_usd_z >3 | steam3$price_usd_z < -3)
+
+#treating outliers
+unique_outliers <- unique(c(pos_rating_outliers, neg_rating_outliers, med_playtime_outliers, price_outliers))
+steam3 <- steam3[-unique_outliers, ]
+steam3 <- subset(steam3, select = -c(positive_ratings_z, negative_ratings_z, median_playtime_z, price_usd_z))
+
+#cleaning environment back up
+remove(med_playtime_outliers, na_rows, neg_rating_outliers, new_na_rows, pos_rating_outliers, price_outliers, unique_outliers)
+```
+
+Upon narrowing down my dataset to variables that I was interested in utilizing for my linear regression model, I now needed to continue my data cleansing by determining the presence of outliers. This was completed via scaling my continuous variable columns to create z-score columns. The presence of outliers was then determined based upon the presence of a z-score greater than 3 or less than -3, and assigned to an appropriate outlier vector. Each separate outlier vector contained greater than 100 observations, indicating the possibility of over 400 outliers. However, it was not yet known if these were all distinct observations. All outlier observations were then combined into a single vector, unique_outliers. Unique outliers contained 361 observations, indicating that some observations contained outliers for more than one variable. Because the number of outliers was small relative to the overall dataset (361/9805 \* 100 = 3.68%), I felt comfortable dropping all outlier observations.
+
+This brought my final dataset prior to splitting for modeling to 9444 observations of 16 variables. This is a moderate reduction from the 27075 observations of 18 variables.
+
+```{r}
+#univariate visualizations
+ggplot(steam3, aes(x=release_date)) + geom_bar()
+ggplot(steam3, aes(x=release_year)) + geom_bar()
+ggplot(steam3, aes(x=english)) + geom_bar()
+ggplot(steam3, aes(x=required_age)) + geom_histogram(binwidth = 10)
+ggplot(steam3, aes(x=achievements)) + geom_histogram(binwidth = 1500)
+ggplot(steam3, aes(x=positive_ratings)) + geom_histogram(bins=2)
+ggplot(steam3, aes(x=negative_ratings)) + geom_histogram(bins=4)
+ggplot(steam3, aes(x=median_playtime)) + geom_histogram(bins=8)
+ggplot(steam3, aes(x=price_usd)) + geom_histogram(binwidth = 1)
+ggplot(steam3, aes(x=Primary_genre)) + geom_bar()
+ggplot(steam3, aes(x=Primary_category)) + geom_bar()
+
+#tables as necessary for "messy" graphs
+release_table <- steam3 %>% group_by(release_date) %>% count(sort = TRUE) 
+release_table
+Prim_genre_table <- steam3 %>% group_by(Primary_genre) %>% count(sort = TRUE) 
+Prim_genre_table
+Prim_cat_table <- steam3 %>% group_by(Primary_category) %>% count(sort = TRUE) 
+Prim_cat_table
+
+```
+
+Upon finishing my data cleaning process, exploration of the variables continued. For review, my null and alternative hypotheses will be included here:
+
+#### Null hypothesis: The price of a game does not statistically significantly (p \<= 0.05) affect median play time.
+
+#### Alternative hypothesis: The price of a game does statistically significantly (p \<= 0.05) affect median play time.
+
+It can be seen here that price is the dependent variable, in this case price_usd.The price_usd column has a positive-skew, with most values being under a price point of \$10 USD.
+
+The other variables within the dataset would be considered the independent variables.
+
+Many of the categorical variables, and release_date, experienced difficulty being displayed visually. They were therefore formed into tables for exploration. These tables allowed me to visualize the top release date, category, genre, etc.
+
+```{r}
+#bivariate visualizations with dependent variable of interest
+ggplot(steam3, aes(x=release_date, y=median_playtime)) + geom_point() + geom_smooth(method='lm', se=FALSE)
+ggplot(steam3, aes(x=achievements, y=median_playtime)) + geom_point() + geom_smooth(method='lm', se=FALSE)
+ggplot(steam3, aes(x=positive_ratings, y=median_playtime)) + geom_point() + geom_smooth(method='lm', se=FALSE)
+ggplot(steam3, aes(x=negative_ratings, y=median_playtime)) + geom_point() + geom_smooth(method='lm', se=FALSE)
+ggplot(steam3, aes(x=price_usd, y=median_playtime)) + geom_point() + geom_smooth(method='lm', se=FALSE)
+ggplot(steam3, aes(x=Primary_genre, y=median_playtime)) + geom_boxplot()
+ggplot(steam3, aes(x=Primary_category, y=median_playtime)) + geom_boxplot()
+
+#tables based on median playtime for those with difficult visualizations
+Prim_genre_play_table <- steam3 %>% group_by(Primary_genre) %>% reframe(average_median_playtime = round(mean(median_playtime))) %>% arrange(desc(average_median_playtime))
+Prim_genre_play_table
+Prim_cat_play_table <- steam3 %>% group_by(Primary_category) %>% reframe(average_median_playtime = round(mean(median_playtime))) %>% arrange(desc(average_median_playtime))
+Prim_cat_play_table
+
+# dplyr 1.1.2 docs https://dplyr.tidyverse.org/reference/arrange.html 
+```
+
+```{r}
+#assessing correlation between continuous variables
+steam4 <- steam3[,c(6:9, 11)]
+steam_corr <- rcorr(as.matrix(steam4))
+chart.Correlation(steam4, histogram=TRUE, pch=19)
+
+#http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software 
+```
+
+The above chunks of code demonstrate the relationship between the dependent variable and independent variables. The latter code chunk demonstrates the relationship between the continuous, independent variables. It is noted that the highest level of correlation between independent variables is between positive_ratings and negative_ratings, at r=0.67. Neither of these will be removed from the model, however, as the main goal of the model is prediction, rather than investigation into the predictors themselves (Frost, n.d.).The correlation between price_usd and median_playtime is also the same value at 0.67. Again, price_usd will not be removed due to it being the independent variable of interest in the null and alternative hypotheses, and not being related to any other independent variables at greater than at r\>=0.18.
+
+With this, the preparation phase of this modeling process has come to a close. The final dataset that will be split into training and testing sets will be steam3, a dataset of 9444 observations and 16 variables.
+
+# Analysis
+
+## D. Report on your data-analysis process by describing the analysis technique(s) you used to appropriately analyze the data. Include the calculations you performed and their outputs. Justify how you selected the analysis technique(s) you used, including one advantage and one disadvantage of these technique(s).
+
+```{r}
+set.seed(42)
+steam3 <- steam3[!steam3$Primary_category == 'Captions available', ]
+steam3 <- steam3[!steam3$Primary_category == 'Shared/Split Screen', ]
+# these specific two observations had to be dropped secondary to only appearing in the test dataset; they were causing errors while trying to predict later on, so this step was returned to
+
+train_steam <- steam3 %>% dplyr::sample_frac(0.8)
+test_steam <- dplyr::anti_join(steam3, train_steam, by='appid')
+
+test_steam_labels_playtime <- test_steam[, c(1, 9)]
+
+# Statology (2022) https://www.statology.org/train-test-split-r/
+
+```
+
+The first step of creating my linear regression model was splitting my data into training and testing data. This was done utilizing sample_frac() from dplyr (Statology, 2022) due to being straightforward and only utilizing two lines of code to create both a training and testing dataset. However, in my first attempt to predict playtime from my model on my test dataset, it was noted that the testing data contained two Primary_category values that were not present within the testing data. For this reason, these were removed here and the modeling process was begun again, with my steam3 dataframe now having 9442 observations of 16 variables.
+
+```{r}
+#writing cleaned csv to folder
+write.csv(steam3, 'C:\\Users\\lgben\\OneDrive\\Desktop\\MSDA\\D214 - Capstone\\Task 2\\steam3.csv')
+write.csv(train_steam, 'C:\\Users\\lgben\\OneDrive\\Desktop\\MSDA\\D214 - Capstone\\Task 2\\train_steam.csv')
+write.csv(test_steam, 'C:\\Users\\lgben\\OneDrive\\Desktop\\MSDA\\D214 - Capstone\\Task 2\\test_steam.csv')
+write.csv(test_steam_labels_playtime, 'C:\\Users\\lgben\\OneDrive\\Desktop\\MSDA\\D214 - Capstone\\Task 2\\test_steam_labels_price.csv')
+```
+
+The newly created dataframes, train_steam, test_steam, and test_steam_labels_playtime were written to my folder for submission alongside steam3.
+
+```{r}
+#initial model, price only
+set.seed(42)
+model_playtime_only <- lm(median_playtime ~ 1, data=train_steam)
+summary(model_playtime_only)
+```
+
+My first step of modeling, after splitting into training and testing datasets, was to create a simple linear regression model with solely the dependent variable and an intercept. This will be utilized as a "stepping stone," or base, to create my final linear regression model.
+
+```{r}
+#model with all explanatory variables, EXCEPT developer/publisher; causes model to run too long/R crashes
+set.seed(42)
+model_all <- lm(median_playtime ~ release_date + required_age + achievements + positive_ratings + 
+                  negative_ratings + price_usd + Primary_genre + WindowsFLG + MacFLG + LinuxFLG + Primary_category,
+                 data=train_steam)
+summary(model_all)
+plot(model_all)
+rmse_all <- sqrt(mean((train_steam$median_playtime - model_all$fitted.values)^2))
+rmse_all
+AIC(model_all)
+```
+
+Next, a model with all of the variables that I was interested in utilizing is created. This will be called model_all, and will again be part of the process for creating a final linear regression model. Here is where I first begin to explore the output of my model, noting the significant variables within the model, which includes price_usd, the fit of the residuals and the QQ-plot, the root mean square error (RMSE), and the Akiaike information criterion (AIC) of the model.
+
+The RMSE is a measure of the average variability of each prediction relative to the actual value of the independent variable, in this case median_playtime. The RMSE is measured in the same units as the variable, due to taking the square root of the squared difference. The formula is as follows:
+
+RMSE = sqrt( mean( (actual value - predicted value)\^2 ) )
+
+The AIC is a measure of how well a model estimates the prediction error within a dataset (Statology, 2021). The formula for calculating AIC is as follows:
+
+AIC = 2K - 2ln(L)\
+Where K = number of variables in the model\
+Where ln(L) = log-likelihood of the same model
+
+The next portion of modeling will attempt to reduce the AIC as much as possible, utilizing a step-wise approach to create the model (RDocumentation, n.d.). This is one advantage that utilizing R to create a model affords, is a built in function that allows creation of a model that best explains variance, while eliminating the need to manually add or remove variables. However, one disadvantage of this same approach is that other models need to be created and stored beforehand, rather than being done at runtime.
+
+```{r}
+#stepwise selection for model
+set.seed(42)
+better_fit <- step(model_playtime_only, direction = 'forward', scope=formula(model_all), trace=0)
+summary(better_fit)
+better_fit$call
+better_fit$coefficients
+AIC(better_fit)
+
+plot(better_fit)
+hist(better_fit$residuals)
+ggplot(better_fit, aes(x=.fitted, y=.resid)) + geom_point() + geom_hline(yintercept=0)
+rmse_better <- sqrt(mean((test_steam$median_playtime - better_fit$fitted.values)^2))
+```
+
+As stated before, the initial model containing only the dependent variable and the model containing all independent variables would both be utilized in the creation of a final model. That can be seen in the code chunk above. The final, "better_fit" model is created by taking the initial model as a base and moves forward in a step-wise approach towards the model with all independent variables. The "scope" of the step() denotes the maximum possible independent variables that can be used. Step() will systematically add, remove, or both add and remove, independent variables while attempting to only keep significant variables and reduce the AIC of the linear regression model, which is noted to be less than the AIC of the model including all variables of interest.
+
+The output of better_fit\$call gives us the formula created by the step() linear regression algorithm. It's as follows:
+
+lm(formula = median_playtime \~ positive_ratings + negative_ratings + release_date, data = train_steam)
+
+##### It can be seen here that price_usd is not included as a predictor variable, indicating it was not a significant variable in the prediction of median_playtime.
+
+```{r}
+#predicting
+explanatory_data <- test_steam
+head(explanatory_data)
+
+predicted_data <- explanatory_data %>%
+  mutate(median_playtime_predicted = predict(better_fit, explanatory_data))
+
+ggplot(predicted_data, aes(x=median_playtime_predicted)) + geom_histogram(binwidth = 1)
+
+test_steam_with_pred <- cbind(test_steam_labels_playtime, predicted_median = predicted_data$median_playtime_predicted)
+
+finalRMSE <- sqrt(mean((test_steam_with_pred$median_playtime - test_steam_with_pred$predicted_median)^2))
+
+```
+
+The code chunk above creates a dataframe of predictions based on the test_steam dataset. Following this, a dataframe containing only the appid of the game and the predicted and actual median playtimes is created for calculation of the final RMSE. It is seen here that the final RMSE is actually "worse" than the RMSE calculated earlier. The value of this RMSE is 29.12, while the value of the RMSE created from model_all was 24.24.
+
+```{r}
+mod_test_with_pred <- test_steam_with_pred %>% mutate(Playtime = median_playtime) %>% mutate(Pred_Actual = 'Actual')
+mod_test_with_pred2 <- test_steam_with_pred %>% mutate(Playtime = predicted_median) %>% mutate(Pred_Actual = 'Predicted')
+mod_test_with_pred3 <- rbind(mod_test_with_pred, mod_test_with_pred2)
+mod_test_with_pred3 <- subset(mod_test_with_pred3, select = -c(median_playtime, predicted_median))
+
+remove(mod_test_with_pred, mod_test_with_pred2)
+
+ggplot(data = mod_test_with_pred3, aes(x= appid, y = Playtime)) +
+  geom_point( aes(color=Pred_Actual)) +
+  scale_color_manual(values = c("blue", "green"),
+                     labels = c("Actual", "Predicted")) +
+  labs(title="Actual v Predicted Median Playtime") +
+  xlab("GameID") +
+  ylab("Median Playtime") +
+  theme(legend.position = "right")
+
+#
+```
+
+The above code chunk demonstrates a transformation of my test_steam_with_pred dataframe, that was just created in the prior step, into one that is manageable for creating a visualization based on 'predicted' vs 'actual' median playtime. This was done by transforming the test_steam_with_pred dataframe into two separate dataframes, relabeling the specific median value as "Playtime," to bring all median playtime values into a singular column, and adding in a label column with 'Predicted' for predicted values and 'Actual' for actual values. These two dataframes then had their rows bound using rbind(), and extraneous columns were removed. This process was adapted from a StackOverflow exchange asking a similar question (2021).
+
+Finally, the graph that is outputted demonstrates both the predicted and actual median playtime values for the games within the Steam store, released since 2018. It should be noted that despite the final model's RMSE being poorer than the model with all independent variables, the AIC was improved. This likely explains why the predictions appear to be more closely/have less variability compared to the actual values.
+
+# Data Summary and Implications
+
+## E. Summarize the implications of your data analysis by discussing the results of your data analysis in the context of the research question, including one limitation of your analysis. Within the context of your research question, recommend a course of action based on your results. Then propose two directions or approaches for future study of the data set.
+
+Once again, I set out to answer the following research question:
+
+##### Utilizing existing Steam Store game data, to what extent does a video game's price point affect its users' play time?
+
+The null and alternative hypotheses that I posed were as follows:
+
+##### Null hypothesis: The price of a game does not statistically significantly (p \<= 0.05) affect median play time.
+
+##### Alternative hypothesis: The price of a game does statistically significantly (p \<= 0.05) affect median play time.
+
+During the process of model creation, it was found that utilizing a forward step-wise approach to creating a linear regression model produced a model capable of predicting median playtime, without the use of price as a statistically significant variable. For this reason, I am unable to reject the null hypothesis that price does not statistically significantly affect a user's play time with a video game.
+
+In the context of a consumer, I would recommend not considering the cost of a game when considering or predicting how many hours they may play the game. Rather, the individual should consider other statistically significant variables, such as reviews and release date, when considering how long they can expect to play a game they may want to purchase.
+
+One limitation of this analysis is that I limited it to solely "new" games, relative to the collection date of the data. I had a feeling that games with an older release date may have had a larger median playtime, due to the nature of playtime and release date both being date/time measures.
+
+For future study and/or model creation, I would recommend the following:\
+1. Updating the game data to include games from 2019 onwards. There have been countless new releases since 2019, with many being open world games, which traditionally have a longer playtime. I would be curious to see how the model changes, or doesn't change, with the inclusion of even newer titles.\
+2. Create "buckets" or "bins" for developers, publishers, and other categorical variables with 30-50+ unique values. This may allow the creation of a more nuanced model, as dummy columns of explanatory variables were withheld due to the volume of unique values.
+
+## F. Acknowledge sources, using in-text citations and references, for content that is quoted.
+
+1.  Davis, N. (2019, June 12). Steam Store Games (Clean dataset). Kaggle. Retrieved July 6, 2023, from <https://www.kaggle.com/datasets/nikdavis/steam-store-games/code?select=steam.csv>
+2.  (n.d.). Why are we likely to continue with an investment even if it would be rational to give it up? The Decision Lab. Retrieved July 6, 2023, from <https://thedecisionlab.com/biases/the-sunk-cost-fallacy>
+3.  (n.d.). Order rows using column values. Dplyr.Tidyverse.org. Retrieved July 6, 2023, from <https://dplyr.tidyverse.org/reference/arrange.html>
+4.  (n.d.). British Pound (GBP) to US Dollar (USD) Historical Exchange Rates on 1st June 2019 (01/06/2019). Exchange Rates UK. Retrieved July 6, 2023, from <https://www.exchangerates.org.uk/GBP-USD-01_06_2019-exchange-rate-history.html>
+5.  Frost, J. (n.d.). Multicollinearity in Regression Analysis: Problems, Detection, and Solutions. Statistics by Jim. Retrieved July 6, 2023, from <https://statisticsbyjim.com/regression/multicollinearity-in-regression-analysis/>
+6.  Ludwig, P. (n.d.). DECISION PARALYSIS: HOW TO STOP OVERTHINKING YOUR CHOICES. Procrastination.com. Retrieved July 6, 2023, from <https://procrastination.com/blog/9/decision-paralysis-overthinking-choices#>:\~:text=Decision%20paralysis%20occurs%20when%20we,or%20do%20nothing%20at%20all
+7.  Mahto, A. (2019, April 21). Splitstackshape. R-Project.org. Retrieved July 6, 2023, from <https://www.r-project.org/nosvn/pandoc/splitstackshape.html>
+8.  Marsja, E. (2020, August 27). How to Extract Year from Date in R with Examples. Marsja.se. Retrieved July 6, 2023, from <https://www.marsja.se/how-to-extract-year-from-date-in-r-with-examples/>
+9.  RDocumentation (n.d.). As.Is: Cast an object to match class of another object. RDocumentation.org. Retrieved July 6, 2023, from <https://www.rdocumentation.org/packages/gen5helper/versions/1.0.1/topics/as.is>
+10. RDocumentation (n.d.). Step: Choose a model by AIC in a Stepwise Algorithm. Retrieved July 6, 2023, from <https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/step>
+11. Schork, J. (n.d.). R Error in lm.Fit(x, y, offset, singular.Ok , ...) : 0 (non-NA) cases (2 Examples). Retrieved July 6, 2023, from <https://statisticsglobe.com/r-error-in-lm-fit-zero-non-na-cases>
+12. (2021, October 5). Adding legend to ggplot + putting two scatter-plots onto one graph. StackOverflow. Retrieved July 6, 2023, from <https://stackoverflow.com/questions/69458084/adding-legend-to-ggplot-putting-two-scatter-plots-onto-one-graph>
+13. (2015, March 11). Splitting string into unknown number of new dataframe columns. StackOverflow. Retrieved July 6, 2023, from <https://stackoverflow.com/questions/28996634/splitting-string-into-unknown-number-of-new-dataframe-columns>
+14. STHDA (n.d.). Correlation matrix : A quick start guide to analyze, format and visualize a correlation matrix using R software. Retrieved July 6, 2023, from <http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software>
+15. Z. (2021, May 20). How to Calculate AIC in R (Including Examples). Retrieved July 6, 2023, from <https://www.statology.org/aic-in-r/#>:\~:text=The%20Akaike%20information%20criterion%20(AIC,The%20number%20of%20model%20parameters
+16. Z. (2022, April 12). How to Split Data into Training & Test Sets in R (3 Methods). Retrieved July 6, 2023, from <https://www.statology.org/train-test-split-r/>
