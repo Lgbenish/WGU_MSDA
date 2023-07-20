@@ -1,0 +1,19 @@
+SELECT c.customer_id, l.state AS state
+FROM customer AS c
+INNER JOIN location AS l
+USING (location_id)
+--selecting customers with below avg charges, above avg income
+--been with company for 2 years, and have both phone/internet but NOT fiber
+WHERE customer_id IN
+	(
+SELECT customer_id
+FROM services2
+INNER JOIN customer
+USING (customer_id)
+WHERE "Internet" = 'DSL' 
+		AND "Phone" = 'Yes'
+		AND tenure > 2
+		AND monthly_charge < (SELECT AVG(monthly_charge) FROM customer)
+		AND income > (SELECT AVG(income) FROM customer)
+	)
+ORDER BY state;
